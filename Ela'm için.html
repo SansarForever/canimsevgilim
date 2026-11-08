@@ -1,0 +1,642 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Küçük Bahçe</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Jost:wght@400&display=swap">
+<style>
+/* Layout: a single lamp-lit scene (canvas) hanging from the top of the page, the note set beneath it. One committed dark look. */
+:root {
+  --ground: #07111f;
+  --navy: #0c1d3a;
+  --navy-lift: #1b3b6b;
+  --lamp: #fffbee;
+  --note: #e9eef8;
+  --petal: #f6a8c0;
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+html { min-height: 100%; }
+body {
+  background-color: var(--ground);
+  background-image:
+    radial-gradient(ellipse 70% 42% at 50% 0%, var(--navy-lift) 0%, rgba(27, 59, 107, 0) 100%),
+    linear-gradient(180deg, var(--navy) 0%, var(--ground) 100%);
+  background-repeat: no-repeat;
+  color: var(--note);
+  font-family: var(--font-ui);
+  min-height: 100%;
+  padding-block: 0 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 640px;
+  margin: 0 auto;
+}
+#scene {
+  display: block;
+  width: min(100%, calc(84vh * 0.684));
+  height: auto;
+  aspect-ratio: 520 / 760;
+}
+.note {
+  max-width: 28em;
+  min-width: 0;
+  margin-top: 4px;
+  text-align: center;
+}
+.note p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(1.3rem, 4.8vw, 1.65rem);
+  line-height: 1.5;
+  color: var(--note);
+  text-wrap: balance;
+}
+.note .sign {
+  margin-top: 18px;
+  font-weight: 600;
+  font-size: clamp(1.6rem, 6.4vw, 2.1rem);
+  color: var(--lamp);
+}
+.note .from {
+  margin-top: 14px;
+  font-family: var(--font-ui);
+  font-style: normal;
+  font-weight: 400;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: rgba(233, 238, 248, 0.7);
+}
+@media (max-width: 480px) {
+  main { max-width: none; }
+  .note { margin-top: 0; padding-inline: 4px; }
+}
+</style>
+
+<main>
+  <canvas id="scene" role="img" aria-label="Lacivert bir odada, tepeden gelen sakin bir lamba ışığının altında, içinde nilüfer, lale ve zambak olan bir saksı. Çiçekler hafifçe sallanıyor."></canvas>
+  <div class="note">
+    <p>Dünyadaki bütün çiçekleri toplasam bile senin güzelliğini anlatmaya yetmezdi. O yüzden sana küçük bir bahçe hazırladım.</p>
+    <p class="sign">Güzeller Güzelim benim.🌸</p>
+    <p class="from">– Seni her şeyden çok seven sevgilin</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var cv = document.getElementById('scene');
+  var ctx = cv.getContext('2d');
+  var W = 600, H = 760, VX = 40, VW = 520, TAU = Math.PI * 2, PI = Math.PI;
+  var sin = Math.sin, cos = Math.cos;
+  var scale = 1;
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.max(1, Math.round(r.width * dpr));
+    cv.height = Math.max(1, Math.round(r.height * dpr));
+    scale = cv.width / VW;
+  }
+
+  /* ---------- scene data ---------- */
+  var POT = { cx: 300, rimY: 585, rimRx: 150, rimRy: 34, botY: 725, botRx: 105 };
+  var WATER = { cx: 300, cy: 591, rx: 129, ry: 25 };
+
+  var plants = [
+    { k: 'lily',  bx: 300, by: 579, px: 300, py: 196, s: 50, ph: 2.1, amp: 6, sp: 0.70,
+      leaves: [{ dx: -48, dy: 60, w: 5 }, { dx: 52, dy: 54, w: 5 }] },
+    { k: 'bud',   bx: 338, by: 581, px: 408, py: 262, s: 50, ph: 1.0, amp: 7, sp: 0.85,
+      leaves: [{ dx: 44, dy: 72, w: 5 }] },
+    { k: 'lily',  bx: 266, by: 581, px: 186, py: 296, s: 58, ph: 0.2, amp: 8, sp: 0.75,
+      leaves: [{ dx: -60, dy: 68, w: 5 }] },
+    { k: 'tulip', bx: 242, by: 585, px: 150, py: 440, s: 54, ph: 0.6, amp: 7, sp: 0.95,
+      c1: '#fbb7cb', c2: '#d93f7c',
+      leaves: [{ dx: -78, dy: 98, w: 9 }, { dx: -32, dy: 62, w: 7 }] },
+    { k: 'tulip', bx: 284, by: 587, px: 268, py: 424, s: 54, ph: 1.7, amp: 6, sp: 1.05,
+      c1: '#ff9a8f', c2: '#c42642',
+      leaves: [{ dx: -48, dy: 72, w: 8 }] },
+    { k: 'tulip', bx: 322, by: 587, px: 336, py: 414, s: 54, ph: 2.6, amp: 6, sp: 0.90,
+      c1: '#ffeab0', c2: '#f2994a',
+      leaves: [{ dx: 52, dy: 78, w: 8 }] },
+    { k: 'tulip', bx: 362, by: 585, px: 452, py: 446, s: 54, ph: 3.4, amp: 7, sp: 1.00,
+      c1: '#f9aedb', c2: '#a63a90',
+      leaves: [{ dx: 82, dy: 98, w: 9 }, { dx: 36, dy: 62, w: 7 }] },
+    { k: 'bud',   bx: 256, by: 580, px: 226, py: 232, s: 44, ph: 4.0, amp: 6, sp: 0.80,
+      leaves: [{ dx: -40, dy: 64, w: 5 }] },
+    { k: 'tulip', bx: 212, by: 586, px: 198, py: 394, s: 54, ph: 5.1, amp: 6, sp: 0.92,
+      c1: '#fff1c9', c2: '#f0b429',
+      leaves: [{ dx: -70, dy: 92, w: 8 }] },
+    { k: 'tulip', bx: 396, by: 586, px: 394, py: 460, s: 54, ph: 4.4, amp: 6, sp: 1.02,
+      c1: '#d9c4ff', c2: '#7d4fd0',
+      leaves: [{ dx: 70, dy: 90, w: 8 }] },
+    { k: 'lily',  bx: 380, by: 582, px: 412, py: 346, s: 44, ph: 3.7, amp: 7, sp: 0.78,
+      leaves: [{ dx: 58, dy: 70, w: 5 }] }
+  ];
+
+  var pads = [
+    { x: 232, y: 602, rx: 30, ry: 8.5, ph: 0.4, notch: 0.5 },
+    { x: 378, y: 601, rx: 26, ry: 7.5, ph: 1.9, notch: 2.4 },
+    { x: 266, y: 613, rx: 22, ry: 6,   ph: 3.1, notch: 4.2 },
+    { x: 354, y: 612, rx: 21, ry: 6,   ph: 4.4, notch: 1.2 }
+  ];
+
+  var motes = [], i;
+  for (i = 0; i < 30; i++) {
+    motes.push({ u: Math.random() * 2 - 1, y: Math.random() * 660, sp: 3 + Math.random() * 7,
+                 r: 0.7 + Math.random() * 1.3, ph: Math.random() * TAU });
+  }
+  var drift = [];
+  for (i = 0; i < 7; i++) {
+    drift.push({ x: 140 + Math.random() * 320, y0: Math.random() * 520, sp: 9 + Math.random() * 8,
+                 ph: Math.random() * TAU, s: 4 + Math.random() * 2.5, rot: Math.random() * TAU });
+  }
+
+  var potBody = new Path2D();
+  potBody.moveTo(POT.cx - POT.rimRx, POT.rimY);
+  potBody.lineTo(POT.cx - POT.botRx, POT.botY);
+  potBody.ellipse(POT.cx, POT.botY, POT.botRx, 18, 0, PI, 0, true);
+  potBody.lineTo(POT.cx + POT.rimRx, POT.rimY);
+  potBody.closePath();
+
+  function halfWidthAt(y) { return POT.rimRx - (y - POT.rimY) * ((POT.rimRx - POT.botRx) / (POT.botY - POT.rimY)); }
+
+  /* ---------- light ---------- */
+  function coneHalf(y) { return lerp(36, 250, (y - 64) / 681); }
+
+  function drawLight(t) {
+    var k = 0.93 + 0.07 * sin(t * 0.6);
+    var n;
+    for (n = 0; n < 4; n++) {
+      var f = 1 - n * 0.18;
+      var g = ctx.createLinearGradient(0, 64, 0, 745);
+      g.addColorStop(0, 'rgba(255,251,238,' + (0.10 * k) + ')');
+      g.addColorStop(1, 'rgba(255,251,238,' + (0.012 * k) + ')');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(300 - 36 * f, 64);
+      ctx.lineTo(300 + 36 * f, 64);
+      ctx.lineTo(300 + 250 * f, 745);
+      ctx.lineTo(300 - 250 * f, 745);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(300, 738);
+    ctx.scale(1, 0.16);
+    var pg = ctx.createRadialGradient(0, 0, 0, 0, 0, 250);
+    pg.addColorStop(0, 'rgba(255,251,238,' + (0.34 * k) + ')');
+    pg.addColorStop(1, 'rgba(255,251,238,0)');
+    ctx.fillStyle = pg;
+    ctx.beginPath(); ctx.arc(0, 0, 250, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(2,8,18,0.5)';
+    ctx.beginPath(); ctx.ellipse(300, 733, 124, 12, 0, 0, TAU); ctx.fill();
+  }
+
+  function drawLamp(t) {
+    ctx.strokeStyle = 'rgba(200,210,230,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(300, 0); ctx.lineTo(300, 28); ctx.stroke();
+    var sg = ctx.createLinearGradient(258, 0, 342, 0);
+    sg.addColorStop(0, '#9aa7c2'); sg.addColorStop(0.45, '#f1f4fa'); sg.addColorStop(1, '#8794b2');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.moveTo(258, 63);
+    ctx.bezierCurveTo(258, 38, 280, 26, 300, 26);
+    ctx.bezierCurveTo(320, 26, 342, 38, 342, 63);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#fffdf3';
+    ctx.beginPath(); ctx.ellipse(300, 63, 42, 5.5, 0, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'screen';
+    var k = 0.92 + 0.08 * sin(t * 0.6);
+    var g = ctx.createRadialGradient(300, 66, 2, 300, 66, 72);
+    g.addColorStop(0, 'rgba(255,253,240,' + (0.95 * k) + ')');
+    g.addColorStop(0.25, 'rgba(255,250,230,' + (0.35 * k) + ')');
+    g.addColorStop(1, 'rgba(255,250,230,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(300, 66, 72, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawWash() {
+    ctx.globalCompositeOperation = 'screen';
+    var g = ctx.createRadialGradient(300, 70, 10, 300, 320, 290);
+    g.addColorStop(0, 'rgba(255,252,240,0.14)');
+    g.addColorStop(1, 'rgba(255,252,240,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ---------- pot and water ---------- */
+  function drawPot() {
+    var bg = ctx.createLinearGradient(POT.cx - POT.rimRx, 0, POT.cx + POT.rimRx, 0);
+    bg.addColorStop(0, '#a9b7d3'); bg.addColorStop(0.32, '#f5f7fc');
+    bg.addColorStop(0.62, '#dbe2ef'); bg.addColorStop(1, '#7f8eaf');
+    ctx.fillStyle = bg;
+    ctx.fill(potBody);
+
+    ctx.save();
+    ctx.clip(potBody);
+    var vg = ctx.createLinearGradient(0, POT.rimY, 0, POT.botY + 18);
+    vg.addColorStop(0, 'rgba(255,255,255,0.22)');
+    vg.addColorStop(1, 'rgba(6,16,36,0.38)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, POT.rimY, W, 200);
+    var bands = [[606, 1.6, '#86a1cc'], [614, 4, '#5a7db4'], [626, 4, '#5a7db4']];
+    for (var b = 0; b < bands.length; b++) {
+      var y = bands[b][0], hw = halfWidthAt(y);
+      ctx.strokeStyle = bands[b][2];
+      ctx.lineWidth = bands[b][1];
+      ctx.beginPath();
+      ctx.ellipse(POT.cx, y, hw, hw * (POT.rimRy / POT.rimRx), 0, 0, PI);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    var rg = ctx.createLinearGradient(POT.cx - POT.rimRx, 0, POT.cx + POT.rimRx, 0);
+    rg.addColorStop(0, '#b9c6df'); rg.addColorStop(0.35, '#ffffff');
+    rg.addColorStop(0.7, '#e3e9f4'); rg.addColorStop(1, '#93a1c0');
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.ellipse(POT.cx, POT.rimY, POT.rimRx, POT.rimRy, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(POT.cx, POT.rimY, POT.rimRx - 1, POT.rimRy - 1, 0, PI, TAU); ctx.stroke();
+
+    ctx.fillStyle = '#0d2540';
+    ctx.beginPath(); ctx.ellipse(POT.cx, POT.rimY + 1, 138, 28, 0, 0, TAU); ctx.fill();
+  }
+
+  function drawWater(t) {
+    var g = ctx.createRadialGradient(WATER.cx, WATER.cy - 4, 4, WATER.cx, WATER.cy, 138);
+    g.addColorStop(0, '#3b86b4'); g.addColorStop(0.55, '#1f5a89'); g.addColorStop(1, '#11335a');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(WATER.cx, WATER.cy, WATER.rx, WATER.ry, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.13)';
+    ctx.beginPath(); ctx.ellipse(WATER.cx, WATER.cy - 3, 64, 7, 0, 0, TAU); ctx.fill();
+    var sp = [[250, 586], [312, 584], [352, 590], [214, 596], [386, 594], [296, 599], [270, 590], [336, 601]];
+    for (var s = 0; s < sp.length; s++) {
+      var a = 0.12 + 0.28 * (0.5 + 0.5 * sin(t * 1.8 + s * 1.7));
+      ctx.fillStyle = 'rgba(255,255,255,' + a + ')';
+      ctx.beginPath(); ctx.ellipse(sp[s][0], sp[s][1], 6, 0.9, 0, 0, TAU); ctx.fill();
+    }
+  }
+
+  function drawRipples(t) {
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(WATER.cx, WATER.cy, WATER.rx, WATER.ry, 0, 0, TAU); ctx.clip();
+    for (var k = 0; k < 3; k++) {
+      var ph = ((t * 0.22) + k / 3) % 1;
+      var rx = 30 + ph * 56;
+      ctx.strokeStyle = 'rgba(255,255,255,' + ((1 - ph) * 0.33) + ')';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(306, 606, rx, rx * 0.2, 0, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* ---------- plants ---------- */
+  function stemPoints(p, t) {
+    var h = p.by - p.py;
+    var sw = (sin(t * p.sp + p.ph) * 0.7 + sin(t * p.sp * 0.43 + p.ph * 2.1) * 0.3) * p.amp;
+    var tx = p.px + sw;
+    var ty = p.py + Math.abs(sw) * 0.18;
+    var cx = lerp(p.bx, p.px, 0.5) + sw * 0.3;
+    var cy = p.by - h * 0.55;
+    return { tx: tx, ty: ty, cx: cx, cy: cy, ang: Math.atan2(tx - cx, -(ty - cy)) };
+  }
+
+  function drawLeaf(bx, by, tx, ty, w) {
+    var dx = tx - bx, dy = ty - by;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var nx = -dy / len, ny = dx / len;
+    var mx = bx + dx * 0.5, my = by + dy * 0.5 - Math.abs(dy) * 0.2;
+    var g = ctx.createLinearGradient(bx, by, tx, ty);
+    g.addColorStop(0, '#2b7650'); g.addColorStop(1, '#63c78f');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.quadraticCurveTo(mx + nx * w, my + ny * w, tx, ty);
+    ctx.quadraticCurveTo(mx - nx * w, my - ny * w, bx, by);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawLeaves(t) {
+    for (var n = 0; n < plants.length; n++) {
+      var p = plants[n];
+      for (var l = 0; l < p.leaves.length; l++) {
+        var lf = p.leaves[l];
+        var sway = sin(t * 0.9 + p.ph + l * 1.3) * 4;
+        drawLeaf(p.bx, p.by, p.bx + lf.dx + sway, p.by - lf.dy + Math.abs(sway) * 0.2, lf.w);
+      }
+    }
+  }
+
+  function drawStems(t) {
+    for (var n = 0; n < plants.length; n++) {
+      var p = plants[n];
+      var s = stemPoints(p, t);
+      p.cur = s;
+      var g = ctx.createLinearGradient(0, p.py, 0, p.by);
+      g.addColorStop(0, '#86dca6'); g.addColorStop(1, '#2c6e4d');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = p.k === 'tulip' ? 4.2 : 3.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(p.bx, p.by);
+      ctx.quadraticCurveTo(s.cx, s.cy, s.tx, s.ty);
+      ctx.stroke();
+    }
+  }
+
+  function tulip(s, c1, c2, t, ph) {
+    var h = s, w = s * 0.42;
+    ctx.save();
+    ctx.scale(1 + 0.03 * sin(t * 0.8 + ph), 1);
+    var g = ctx.createLinearGradient(0, 0, 0, -h);
+    g.addColorStop(0, c2); g.addColorStop(1, c1);
+    ctx.strokeStyle = 'rgba(40,0,20,0.14)';
+    ctx.lineWidth = 0.8;
+
+    ctx.fillStyle = c2;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.75, -h * 0.15);
+    ctx.bezierCurveTo(-w * 0.9, -h * 0.7, -w * 0.3, -h * 1.08, 0, -h * 1.12);
+    ctx.bezierCurveTo(w * 0.3, -h * 1.08, w * 0.9, -h * 0.7, w * 0.75, -h * 0.15);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(-w * 1.7, -h * 0.05, -w * 1.35, -h * 0.85, -w * 0.4, -h);
+    ctx.bezierCurveTo(-w * 0.25, -h * 0.65, -w * 0.12, -h * 0.3, 0, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(w * 1.7, -h * 0.05, w * 1.35, -h * 0.85, w * 0.4, -h);
+    ctx.bezierCurveTo(w * 0.25, -h * 0.65, w * 0.12, -h * 0.3, 0, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(-w * 1.0, -h * 0.15, -w * 0.7, -h * 0.8, 0, -h * 0.97);
+    ctx.bezierCurveTo(w * 0.7, -h * 0.8, w * 1.0, -h * 0.15, 0, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.28, -h * 0.25);
+    ctx.quadraticCurveTo(-w * 0.45, -h * 0.6, -w * 0.12, -h * 0.88);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function lilyBud(s, t, ph) {
+    var h = s * 1.15, w = s * 0.2;
+    ctx.save();
+    ctx.rotate(0.12 * sin(t * 0.7 + ph));
+    var g = ctx.createLinearGradient(0, 0, 0, -h);
+    g.addColorStop(0, '#bfe0b4'); g.addColorStop(0.45, '#f4f8e6'); g.addColorStop(1, '#ffffff');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = 'rgba(120,150,190,0.3)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(-w * 1.4, -h * 0.2, -w * 1.1, -h * 0.75, 0, -h);
+    ctx.bezierCurveTo(w * 1.1, -h * 0.75, w * 1.4, -h * 0.2, 0, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,185,150,0.55)';
+    ctx.beginPath(); ctx.moveTo(0, -h * 0.05); ctx.lineTo(0, -h * 0.92); ctx.stroke();
+    ctx.restore();
+  }
+
+  function lilyPetal(L, a, t) {
+    var len = L * (1 + 0.02 * sin(t * 0.9 + a));
+    var wd = L * 0.2;
+    ctx.save();
+    ctx.rotate(a);
+    var g = ctx.createLinearGradient(0, 0, len, 0);
+    g.addColorStop(0, '#f6f1c4'); g.addColorStop(0.25, '#ffffff'); g.addColorStop(1, '#e9eff9');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = 'rgba(120,150,190,0.28)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(len * 0.25, -wd * 0.9, len * 0.65, -wd * 1.1, len, 0);
+    ctx.bezierCurveTo(len * 0.65, wd * 1.1, len * 0.25, wd * 0.9, 0, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(165,200,160,0.5)';
+    ctx.beginPath(); ctx.moveTo(len * 0.1, 0); ctx.lineTo(len * 0.8, 0); ctx.stroke();
+    ctx.restore();
+  }
+
+  function lilyBloom(s, t, ph) {
+    ctx.fillStyle = '#e4efd2';
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.14, 0);
+    ctx.quadraticCurveTo(-s * 0.09, s * 0.25, -s * 0.05, s * 0.42);
+    ctx.lineTo(s * 0.05, s * 0.42);
+    ctx.quadraticCurveTo(s * 0.09, s * 0.25, s * 0.14, 0);
+    ctx.closePath(); ctx.fill();
+
+    ctx.save();
+    ctx.scale(1, 0.6);
+    var back = [], front = [], n, a;
+    for (n = 0; n < 6; n++) {
+      a = -PI / 2 + n * PI / 3 + 0.12;
+      (sin(a) < 0 ? back : front).push(a);
+    }
+    for (n = 0; n < back.length; n++) lilyPetal(s, back[n], t);
+
+    for (n = 0; n < 6; n++) {
+      var b = -PI / 2 + n * PI / 3 + 0.5 + 0.05 * sin(t * 1.1 + n + ph);
+      var fx = cos(b) * s * 0.5, fy = sin(b) * s * 0.5 - s * 0.22;
+      ctx.strokeStyle = '#f3efc0';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(fx, fy); ctx.stroke();
+      ctx.fillStyle = '#d98324';
+      ctx.beginPath(); ctx.ellipse(fx, fy, s * 0.07, s * 0.03, b, 0, TAU); ctx.fill();
+    }
+    ctx.strokeStyle = '#a9d6a0';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(s * 0.05, -s * 0.36); ctx.stroke();
+    ctx.fillStyle = '#8cc98a';
+    ctx.beginPath(); ctx.arc(s * 0.05, -s * 0.37, s * 0.04, 0, TAU); ctx.fill();
+
+    for (n = 0; n < front.length; n++) lilyPetal(s, front[n], t);
+    ctx.restore();
+  }
+
+  function drawHeads(t) {
+    for (var n = 0; n < plants.length; n++) {
+      var p = plants[n], s = p.cur;
+      ctx.save();
+      ctx.translate(s.tx, s.ty);
+      if (p.k === 'tulip') {
+        ctx.rotate(s.ang * 0.45);
+        tulip(p.s, p.c1, p.c2, t, p.ph);
+      } else if (p.k === 'bud') {
+        ctx.rotate(s.ang * 0.5);
+        lilyBud(p.s, t, p.ph);
+      } else {
+        ctx.rotate(s.ang * 0.5);
+        lilyBloom(p.s, t, p.ph);
+      }
+      ctx.restore();
+    }
+  }
+
+  /* ---------- floating things on the water ---------- */
+  function drawPads(t) {
+    for (var n = 0; n < pads.length; n++) {
+      var d = pads[n];
+      var bob = sin(t * 1.0 + d.ph) * 0.8;
+      ctx.save();
+      ctx.translate(d.x, d.y + bob);
+      ctx.rotate(sin(t * 0.5 + d.ph) * 0.04);
+      ctx.scale(1, d.ry / d.rx);
+      var g = ctx.createRadialGradient(-d.rx * 0.2, -d.rx * 0.2, 2, 0, 0, d.rx);
+      g.addColorStop(0, '#5fbc88'); g.addColorStop(1, '#1d6150');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, d.rx, d.notch + 0.18, d.notch + TAU - 0.18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(190,240,205,0.4)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function nilufer(cx, cy, R, t) {
+    var bob = sin(t * 1.1) * 1.2;
+    ctx.save();
+    ctx.translate(cx, cy + bob);
+    ctx.rotate(sin(t * 0.7) * 0.02);
+    ctx.fillStyle = 'rgba(4,22,48,0.38)';
+    ctx.beginPath(); ctx.ellipse(0, 3, R * 0.95, R * 0.14, 0, 0, TAU); ctx.fill();
+
+    var rows = [
+      { th: [-58, -34, -12, 12, 34, 58],  len: 1.0,  wd: 0.30, c0: '#fbe4ec', c1: '#ee7aa4' },
+      { th: [-46, -22, 0, 22, 46],         len: 0.86, wd: 0.31, c0: '#fff0f4', c1: '#f592b5' },
+      null,
+      { th: [-70, -35, 0, 35, 70],         len: 0.62, wd: 0.34, c0: '#fff6f8', c1: '#f8a8c3' }
+    ];
+    for (var r = 0; r < rows.length; r++) {
+      if (!rows[r]) {
+        ctx.fillStyle = '#ffd966';
+        ctx.beginPath(); ctx.ellipse(0, -R * 0.26, R * 0.17, R * 0.07, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 1.2;
+        for (var f = -3; f <= 3; f++) {
+          ctx.beginPath(); ctx.moveTo(f * R * 0.04, -R * 0.2); ctx.lineTo(f * R * 0.06, -R * 0.36); ctx.stroke();
+        }
+        continue;
+      }
+      var row = rows[r];
+      for (var q = 0; q < row.th.length; q++) {
+        var th = row.th[q];
+        var len = R * row.len * (1 + 0.025 * sin(t * 0.8 + th * 0.05));
+        var wd = R * row.wd;
+        ctx.save();
+        ctx.rotate(th * PI / 180);
+        var g = ctx.createLinearGradient(0, 0, 0, -len);
+        g.addColorStop(0, row.c0); g.addColorStop(1, row.c1);
+        ctx.fillStyle = g;
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-wd, -len * 0.3, -wd * 0.8, -len * 0.8, 0, -len);
+        ctx.bezierCurveTo(wd * 0.8, -len * 0.8, wd, -len * 0.3, 0, 0);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+
+  /* ---------- drifting bits in the light ---------- */
+  function drawMotes(t) {
+    for (var n = 0; n < motes.length; n++) {
+      var m = motes[n];
+      var yy = 70 + (((m.y - t * m.sp) % 660) + 660) % 660;
+      var x = 300 + m.u * coneHalf(yy) * 0.95 + sin(t * 0.4 + m.ph) * 6;
+      var fade = Math.min(1, (yy - 70) / 40, (730 - yy) / 40);
+      var a = (0.22 + 0.35 * (0.5 + 0.5 * sin(t * 1.3 + m.ph))) * Math.max(0, fade);
+      ctx.fillStyle = 'rgba(255,252,240,' + a + ')';
+      ctx.beginPath(); ctx.arc(x, yy, m.r, 0, TAU); ctx.fill();
+    }
+  }
+
+  function drawDrift(t) {
+    for (var n = 0; n < drift.length; n++) {
+      var f = drift[n];
+      var y = ((f.y0 + t * f.sp) % 520) + 40;
+      var x = f.x + sin(t * 0.5 + f.ph) * 26;
+      var fade = Math.min(1, (y - 40) / 50, (560 - y) / 50);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(f.rot + t * 0.8);
+      ctx.fillStyle = 'rgba(248,170,195,' + (0.75 * Math.max(0, fade)) + ')';
+      ctx.beginPath(); ctx.ellipse(0, 0, f.s, f.s * 0.55, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /* ---------- frame ---------- */
+  function draw(t) {
+    ctx.setTransform(scale, 0, 0, scale, -VX * scale, 0);
+    ctx.clearRect(VX, 0, VW, H);
+    drawLight(t);
+    drawPot();
+    drawWater(t);
+    drawRipples(t);
+    drawLeaves(t);
+    drawStems(t);
+    drawHeads(t);
+    drawPads(t);
+    nilufer(226, 607, 32, t);
+    nilufer(388, 606, 30, t);
+    nilufer(306, 606, 46, t);
+    drawMotes(t);
+    drawDrift(t);
+    drawWash();
+    drawLamp(t);
+  }
+
+  resize();
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var t0 = performance.now();
+  function loop(now) {
+    draw((now - t0) / 1000);
+    requestAnimationFrame(loop);
+  }
+  window.addEventListener('resize', function () {
+    resize();
+    if (reduce) draw(1.5);
+  });
+  if (reduce) {
+    draw(1.5);
+  } else {
+    requestAnimationFrame(loop);
+  }
+})();
+</script>
+
+</body></html>
